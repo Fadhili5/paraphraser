@@ -1,44 +1,42 @@
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 from datetime import datetime
-from uuid import uuid4
 
-class UserModel:
-    """
-    Raw SQL user model.
-    Handles: creation, fetch, login lookup.
-    DB dependency is passed in, no ORM.
-    """
 
-    @staticmethod
-    async def create_user(conn, email: str, hashed_password: str):
-        user_id = str(uuid4())
-        now = datetime.utcnow()
+class UserDB(BaseModel):
+    id: str
+    username: str
+    email: EmailStr
+    password: str
+    phone: Optional[str]
+    role: str
+    created_at: Optional[datetime]
 
-        query = """
-            INSERT INTO users (id, email, password, created_at)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, email, created_at;
-        """
+    class Config:
+        from_attributes = True
 
-        row = await conn.fetchrow(query, user_id, email, hashed_password, now)
-        return dict(row)
+class UserPublic(BaseModel):
+    id: str
+    username: str
+    email: EmailStr
+    phone: Optional[str]
+    role: str
 
-    @staticmethod
-    async def get_user_by_email(conn, email: str):
-        query = """
-            SELECT id, email, password, created_at
-            FROM users
-            WHERE email = $1
-            LIMIT 1;
-        """
-        row = await conn.fetchrow(query, email)
-        return dict(row) if row else None
+class UserRegisterRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    phone_number: str
 
-    @staticmethod
-    async def get_user_by_id(conn, user_id: str):
-        query = """
-            SELECT id, email, created_at
-            FROM users
-            WHERE id = $1;
-        """
-        row = await conn.fetchrow(query, user_id)
-        return dict(row) if row else None
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserRegisterResponse(BaseModel):
+    message: str
+    user_id: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
