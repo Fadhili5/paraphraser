@@ -46,3 +46,16 @@ def verify_jwt_token(token: str) -> dict | None:
     except InvalidTokenError:
         print("Invalid Token")
         return None
+
+def decode_access_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        return payload
+    except ExpiredSignatureError:
+        return None
+    except InvalidTokenError:
+        return None
