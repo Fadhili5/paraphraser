@@ -4,7 +4,7 @@ import logging
 import uuid
 import asyncpg
 from fastapi import HTTPException, status
-from app.utils.token import create_access_token
+from app.auth.jwt import create_access_token
 from app.auth.password_handler import (
 validate_password_strength, hash_password, verify_password
 )
