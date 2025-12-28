@@ -9,7 +9,7 @@ class UserDAO:
 
     async def get_by_email(self, email: str) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
-            "SELECT id, username, FROM users WHERE email = $1",
+            "SELECT id, username FROM users WHERE email = $1",
             email
         )
         return UserDB(**dict(row)) if row else None
@@ -24,7 +24,7 @@ class UserDAO:
     async def get_by_email_and_username(self, email: str, username: str) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
             """
-            SELECT * FROM users
+            SELECT username, id, phone FROM users
             WHERE email = $1 OR username = $2
             """,
             email, username
