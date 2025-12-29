@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Menu, X, Globe, User, LogOut, History } from "lucide-react";
-import { getToken } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
+import { logoutUser } from "@/lib/api";
 
 interface HeaderProps {
   onLoginClick?: () => void;
@@ -28,24 +29,7 @@ export default function Header({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // Check authentication status
-  useEffect(() => {
-    const checkAuth = () => {
-      const token = getToken();
-      setIsAuthenticated(!!token);
-    };
-    checkAuth();
-    // Listen for storage changes (e.g., when token is set/removed)
-    window.addEventListener("storage", checkAuth);
-    // Check periodically (for same-tab updates)
-    const interval = setInterval(checkAuth, 1000);
-    return () => {
-      window.removeEventListener("storage", checkAuth);
-      clearInterval(interval);
-    };
-  }, []);
+  const { isAuthenticated, logout } = useAuth();
 
   const handleLanguageSelect = (code: string) => {
     setSelectedLanguage(code);
@@ -54,10 +38,11 @@ export default function Header({
   };
 
   const handleLogout = () => {
+    logoutUser();
+    logout();
     if (onLogoutClick) {
       onLogoutClick();
     }
-    setIsAuthenticated(false);
     setIsMobileMenuOpen(false);
   };
 
