@@ -88,15 +88,27 @@ export const useAuthStore = create<AuthState>()(
           // Check if token exists and is not expired
           const token = getToken();
           if (!token) {
-            set({ token: null, isAuthenticated: false });
+            const currentState = get();
+            if (currentState.isAuthenticated) {
+              // Was authenticated but token is gone, trigger logout
+              get().logout();
+            } else {
+              set({ token: null, isAuthenticated: false });
+            }
             return;
           }
 
           // Check if token is expired
           if (isTokenExpired(token)) {
-            // Token expired, clear it
-            removeToken();
-            set({ token: null, isAuthenticated: false });
+            // Token expired, clear it and trigger logout
+            const currentState = get();
+            if (currentState.isAuthenticated) {
+              // Was authenticated but token expired, trigger logout
+              get().logout();
+            } else {
+              removeToken();
+              set({ token: null, isAuthenticated: false });
+            }
             return;
           }
 
