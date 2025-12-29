@@ -1,35 +1,44 @@
+from pydantic import BaseModel, EmailStr, ConfigDict
+from typing import Optional
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 
 
 class UserDB(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     username: str
     email: EmailStr
-    password: str
-    phone: Optional[str]
-    role: str
-    created_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    # Change the requirements to optional
+    password: Optional[str] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    # Removed the class Config, this will be deprecated
+    #class Config:
+    #    from_attributes = True
+
 
 class UserPublic(BaseModel):
     id: str
     username: str
     email: EmailStr
-    phone: Optional[str]
+    phone_number: Optional[str]
     role: str
 
 class UserRegisterRequest(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
-    phone_number: str
+    phone: str
 
 class UserLoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class UserRegisterResponse(BaseModel):
