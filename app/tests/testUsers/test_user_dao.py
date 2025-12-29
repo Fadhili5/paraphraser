@@ -88,7 +88,7 @@ async def test_get_by_email_and_username_found(user_dao, mock_conn):
     mock_conn.fetchrow.assert_awaited_once()
     assert isinstance(result, UserDB)
     assert result.id == "user03"
-    assert result.useremail == "another@example.com"
+    assert result.email == "another@example.com"
     assert result.username == "andanotherdev"
     assert result.phone == "0783434834"
     assert result.role == "user"

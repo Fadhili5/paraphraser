@@ -12,10 +12,10 @@ async def register_user(payload: UserRegisterRequest, db_pool: asyncpg.pool.Pool
     service = UserService(db_pool)
 
     return await service.register_user(
-        email=payload.EmailStr,
+        email=payload.email,
         username=payload.username,
-        phone_number=payload.phone_number,
         password=payload.password,
+        phone_number=payload.phone_number,
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -23,6 +23,6 @@ async def user_login(payload: UserLoginRequest, db_pool: asyncpg.pool.Pool = Dep
     service = UserService(db_pool)
 
     return await service.user_login(
-        email=payload.EmailStr,
+        email=payload.email,
         password=payload.password
     )

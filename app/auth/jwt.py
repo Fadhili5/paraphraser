@@ -5,7 +5,7 @@ import os
 import dotenv
 from dotenv import load_dotenv
 from fastapi import Request, HTTPException, Depends
-from jwt import ExpiredSignatureError, InvalidTokenError
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 load_dotenv()
 
@@ -15,6 +15,8 @@ ALGORITHM = "HS256"
 async def create_access_token(subject: dict, expires_delta: timedelta = timedelta(minutes=5)):
     to_encode = subject.copy()
     to_encode.update({"exp": datetime.utcnow() + expires_delta})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 
 async def get_current_user(request: Request):
