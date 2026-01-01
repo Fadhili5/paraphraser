@@ -15,7 +15,7 @@ async def register_user(payload: UserRegisterRequest, db_pool: asyncpg.pool.Pool
         email=payload.email,
         username=payload.username,
         password=payload.password,
-        phone_number=payload.phone_number,
+        phone=payload.phone,
     )
 
 @router.post("/login", response_model=TokenResponse)

@@ -3,45 +3,43 @@ import logging
 from fastapi import HTTPException, status
 
 from app.users.dao import UserDAO
-from app.auth.password_handler import (
-    validate_password_strength,
-    hash_password,
-    verify_password,
-)
+from app.auth.password_handler import (validate_password_strength, hash_password, verify_password)
 from app.auth.jwt import create_access_token
-from app.users.model import UserRegisterResponse, TokenResponse, UserDB
+from app.users.model import UserRegisterResponse, TokenResponse
 
 logger = logging.getLogger(__name__)
 
-
 class UserService:
     def __init__(self, dao: UserDAO | None = None, db_pool=None):
-        if dao:
+        if dao is not None:
             self.dao = dao
-        elif db_pool:
+        elif db_pool is not None:
             self.dao = UserDAO(db_pool)
         else:
             raise ValueError("UserService requires either dao or db_pool")
 
-    async def register_user(self, email: str, password: str, phone_number: str, username: str):
-        # Perform a password validation check first
-        if not validate_password_strength(password):
+    async def register_user(self, email: str, password: str, phone: str, username: str):
+        # 1. Password validation with proper error propagation
+        try:
+            validate_password_strength(password)
+        except ValueError as e:
             raise HTTPException(
-                status_code=400,
-                detail="Password must contain at least one special character",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
             )
 
-        # Perform Check for an existing user
+        # 2. Check for existing user
         existing = await self.dao.get_by_email_and_username(
             email=email,
             username=username,
         )
         if existing:
             raise HTTPException(
-                status_code=400,
-                detail="User with this email or username already exists",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User already exists",
             )
 
+        # 3. Create user
         user_id = str(uuid.uuid4())[:8]
         hashed_password = hash_password(password)
 
@@ -50,7 +48,7 @@ class UserService:
             username=username,
             email=email,
             hashed_password=hashed_password,
-            phone=phone_number,
+            phone=phone,
         )
 
         return UserRegisterResponse(
@@ -76,4 +74,3 @@ class UserService:
         token = create_access_token({"user_id": user.id})
 
         return TokenResponse(access_token=token)
-
