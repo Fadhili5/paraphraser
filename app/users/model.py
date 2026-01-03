@@ -36,10 +36,12 @@ class UserRegisterRequest(BaseModel):
     email: str
     password: str
     phone: str
+    recaptcha_token: str
 
 class UserLoginRequest(BaseModel):
     email: str
     password: str
+    recaptcha_token: str
 
 class UserRegisterResponse(BaseModel):
     message: str

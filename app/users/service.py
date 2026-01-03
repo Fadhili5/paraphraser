@@ -9,6 +9,7 @@ from app.users.model import UserRegisterResponse, TokenResponse
 
 logger = logging.getLogger(__name__)
 
+
 class UserService:
     def __init__(self, dao: UserDAO | None = None, db_pool=None):
         if dao is not None:
