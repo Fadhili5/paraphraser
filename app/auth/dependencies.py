@@ -6,11 +6,13 @@ from app.auth.jwt import decode_access_token
 from app.users.dao import UserDAO
 from app.db.connection import get_pool
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/users/login")
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db_pool: asyncpg.pool.Pool = Depends(get_pool)):
-    # token comes from authorization header
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db_pool: asyncpg.pool.Pool = Depends(get_pool),
+):
     payload = decode_access_token(token)
 
     if not payload:
@@ -20,21 +22,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db_pool: asyncpg
         )
 
     user_id = payload.get("user_id")
-
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
         )
 
-    async with db_pool.acquire() as conn:
-        dao = UserDAO(conn)
-        user = await dao.get_by_id(user_id)
+    dao = UserDAO(db_pool)
+    user = await dao.get_by_id(user_id)
 
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-            )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
 
-        return user
+    return user
