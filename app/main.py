@@ -1,16 +1,20 @@
-# main.py
+# app/main.py
 from fastapi import FastAPI
-from app.users.route import router as users_router
-from app.paraphrase.route import router as paraphrase_router
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.ex_router import api_router
 
 app = FastAPI(
-    title="AI Paraphraser",
-    version="1.0.0"
+    title="AI Paraphraser API",
+    version="1.0.0",
 )
 
-app.include_router(users_router, prefix="/users", tags=["Users"])
-app.include_router(paraphrase_router, prefix="/paraphrase", tags=["Paraphraser"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def root():
-    return {"message": "Paraphraser API is running"}
+app.include_router(api_router)

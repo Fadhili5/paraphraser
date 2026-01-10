@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request
-from app.core.rate_limit import rate_limit
+# app/api/ex_router.py
+from fastapi import APIRouter
 
-router = APIRouter()
+from app.users.route import router as users_router
+from app.paraphrase.route import router as paraphrase_router
 
-@router.get("/preview")
-@rate_limit(limit=10, window=60)
-async def preview(request: Request):
-    return {"message": "Still under rate limit."}
+api_router = APIRouter()
+
+api_router.include_router(users_router)
+api_router.include_router(paraphrase_router)
