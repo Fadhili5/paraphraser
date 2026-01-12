@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { X, Mail, Lock, Loader2 } from "lucide-react";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { loginUser } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import type { ApiErrorResponse } from "@/lib/types";
@@ -37,6 +38,7 @@ export default function LoginModal({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   const {
     register,
@@ -52,9 +54,26 @@ export default function LoginModal({
     setIsLoading(true);
 
     try {
+      // Generate reCAPTCHA token
+      let recaptchaToken = "";
+      if (executeRecaptcha) {
+        try {
+          recaptchaToken = await executeRecaptcha("login");
+        } catch (recaptchaError) {
+          console.error("reCAPTCHA error:", recaptchaError);
+          setError("reCAPTCHA verification failed. Please try again.");
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        // If reCAPTCHA is not available, show warning but continue
+        console.warn("reCAPTCHA is not available. Login may fail if backend requires it.");
+      }
+
       const response = await loginUser({
         email: data.email,
         password: data.password,
+        recaptcha_token: recaptchaToken,
       });
 
       // Token is automatically stored by loginUser and auth store
@@ -67,13 +86,52 @@ export default function LoginModal({
       reset();
       onClose();
     } catch (err: any) {
-      // Handle API errors
-      if (err.response?.status === 401) {
+      // Log the full error for debugging
+      console.error("Login error:", err);
+      
+      // Safely access error properties
+      const errorResponse = err?.response;
+      const errorMessage = err?.message || String(err);
+      
+      console.error("Error response:", errorResponse);
+      console.error("Error message:", errorMessage);
+      
+      // Handle network errors (no response)
+      if (!errorResponse) {
+        const errorCode = err?.code;
+        if (errorCode === 'ECONNABORTED' || errorMessage?.includes('timeout')) {
+          setError("Request timed out. Please check your connection and try again.");
+        } else if (errorMessage?.includes('Network Error') || errorCode === 'ERR_NETWORK') {
+          setError("Network error. Please check if the backend server is running.");
+        } else if (errorMessage?.includes('CORS')) {
+          setError("CORS error. The backend server needs to be configured to allow requests from this origin.");
+        } else {
+          setError(`Connection error: ${errorMessage || "Unable to reach the server. Please check if the backend is running."}`);
+        }
+      }
+      // Handle API errors with response
+      else if (errorResponse?.status === 400) {
+        const errorDetail = errorResponse?.data?.detail || "Invalid request. Please check your input.";
+        setError(errorDetail);
+      } else if (errorResponse?.status === 401) {
         setError("Invalid credentials. Please check your email and password.");
-      } else if (err.response?.data?.detail) {
-        setError(err.response.data.detail);
+      } else if (errorResponse?.status === 403) {
+        // reCAPTCHA verification failed or bot detected
+        const errorDetail = errorResponse?.data?.detail || "reCAPTCHA verification failed";
+        if (errorDetail.includes("Bot Detected")) {
+          setError("Bot detected. Please try again.");
+        } else {
+          setError("reCAPTCHA verification failed. Please try again.");
+        }
+      } else if (errorResponse?.status === 503) {
+        // reCAPTCHA service unavailable
+        setError("reCAPTCHA verification services are currently unavailable. Please try again later.");
+      } else if (errorResponse?.data?.detail) {
+        setError(errorResponse.data.detail);
+      } else if (errorResponse?.status) {
+        setError(`Server error (${errorResponse.status}). Please try again.`);
       } else {
-        setError("An error occurred. Please try again.");
+        setError(`An error occurred: ${errorMessage || "Please try again."}`);
       }
     } finally {
       setIsLoading(false);

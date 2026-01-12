@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { X, Mail, Lock, User, Phone, Loader2, Check, XCircle } from "lucide-react";
+import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { registerUser } from "@/lib/api";
 import { loginUser } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -83,6 +84,7 @@ export default function RegisterModal({
     checkPasswordStrength("")
   );
   const { login } = useAuth();
+  const { executeRecaptcha } = useGoogleReCaptcha();
 
   const {
     register,
@@ -107,12 +109,28 @@ export default function RegisterModal({
     setIsLoading(true);
 
     try {
+      // Generate reCAPTCHA token
+      let recaptchaToken = "";
+      if (executeRecaptcha) {
+        try {
+          recaptchaToken = await executeRecaptcha("register");
+        } catch (recaptchaError) {
+          console.error("reCAPTCHA error:", recaptchaError);
+          setError("reCAPTCHA verification failed. Please try again.");
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        console.warn("reCAPTCHA is not available. Registration may fail if backend requires it.");
+      }
+
       // Register user
       const response = await registerUser({
         username: data.username,
         email: data.email,
         password: data.password,
-        phone_number: data.phone_number,
+        phone: data.phone_number,
+        recaptcha_token: recaptchaToken,
       });
 
       // Auto-login after successful registration
@@ -120,6 +138,7 @@ export default function RegisterModal({
         const loginResponse = await loginUser({
           email: data.email,
           password: data.password,
+          recaptcha_token: "", // Placeholder - will be implemented in Task 10
         });
 
         // Token is automatically stored by loginUser and auth store
@@ -143,9 +162,32 @@ export default function RegisterModal({
         }, 2000);
       }
     } catch (err: any) {
-      // Handle API errors
-      if (err.response?.status === 400) {
-        const errorDetail = err.response.data?.detail || "";
+      // Log the full error for debugging
+      console.error("Register error:", err);
+      
+      // Safely access error properties
+      const errorResponse = err?.response;
+      const errorMessage = err?.message || String(err);
+      
+      console.error("Error response:", errorResponse);
+      console.error("Error message:", errorMessage);
+      
+      // Handle network errors (no response)
+      if (!errorResponse) {
+        const errorCode = err?.code;
+        if (errorCode === 'ECONNABORTED' || errorMessage?.includes('timeout')) {
+          setError("Request timed out. Please check your connection and try again.");
+        } else if (errorMessage?.includes('Network Error') || errorCode === 'ERR_NETWORK') {
+          setError("Network error. Please check if the backend server is running.");
+        } else if (errorMessage?.includes('CORS')) {
+          setError("CORS error. The backend server needs to be configured to allow requests from this origin.");
+        } else {
+          setError(`Connection error: ${errorMessage || "Unable to reach the server. Please check if the backend is running."}`);
+        }
+      }
+      // Handle API errors with response
+      else if (errorResponse?.status === 400) {
+        const errorDetail = errorResponse?.data?.detail || "";
         if (errorDetail.includes("already exists")) {
           setError("User with this email or username already exists.");
         } else if (errorDetail.includes("too weak") || errorDetail.includes("Password")) {
@@ -153,10 +195,25 @@ export default function RegisterModal({
         } else {
           setError(errorDetail || "Invalid input. Please check your information.");
         }
-      } else if (err.response?.data?.detail) {
-        setError(err.response.data.detail);
+      } else if (errorResponse?.status === 401) {
+        setError("Invalid credentials. Please check your email and password.");
+      } else if (errorResponse?.status === 403) {
+        // reCAPTCHA verification failed or bot detected
+        const errorDetail = errorResponse?.data?.detail || "reCAPTCHA verification failed";
+        if (errorDetail.includes("Bot Detected")) {
+          setError("Bot detected. Please try again.");
+        } else {
+          setError("reCAPTCHA verification failed. Please try again.");
+        }
+      } else if (errorResponse?.status === 503) {
+        // reCAPTCHA service unavailable
+        setError("reCAPTCHA verification services are currently unavailable. Please try again later.");
+      } else if (errorResponse?.data?.detail) {
+        setError(errorResponse.data.detail);
+      } else if (errorResponse?.status) {
+        setError(`Server error (${errorResponse.status}). Please try again.`);
       } else {
-        setError("An error occurred. Please try again.");
+        setError(`An error occurred: ${errorMessage || "Please try again."}`);
       }
     } finally {
       setIsLoading(false);
