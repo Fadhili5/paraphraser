@@ -6,15 +6,17 @@ from app.auth.guard import paid_user
 def usage_guard(characters_needed: int):
     async def _guard(user=Depends(paid_user)):
         plan = user.plan
-        limit = PLAN_LIMITS.get(plan)
+        plan_config = PLAN_LIMITS.get(plan)
 
-        if limit is None:
+        if not plan_config:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Unknown subscription plan",
             )
 
-        if user.monthly_characters_used + characters_needed > limit:
+        max_chars = plan_config["max_characters"]
+
+        if user.monthly_characters_used + characters_needed > max_chars:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail="Monthly usage limit exceeded",
