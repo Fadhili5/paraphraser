@@ -3,27 +3,46 @@
 import { useState } from "react";
 import TextArea from "@/components/TextArea";
 import ModeSelector from "@/components/ModeSelector";
+import { paraphraseText } from "@/lib/api";
 
 export default function Home() {
   const [inputText, setInputText] = useState("");
   const [outputText, setOutputText] = useState("");
   const [selectedMode, setSelectedMode] = useState("standard");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleParaphrase = () => {
-    // Placeholder for paraphrase functionality (will be implemented in Task 13)
-    console.log("Paraphrase clicked", { text: inputText, mode: selectedMode });
-    // For now, just show a placeholder
+  const handleParaphrase = async () => {
+    if (!inputText.trim()) return;
+
     setIsLoading(true);
-    setTimeout(() => {
-      setOutputText("Paraphrased text will appear here...");
+    setError(null);
+
+    try {
+      const response = await paraphraseText({
+        text: inputText,
+        mode: selectedMode,
+      });
+      setOutputText(response.paraphrased_text);
+    } catch (err: unknown) {
+      console.error("Paraphrase failed:", err);
+      const errorResponse = (err as { response?: { data?: { detail?: string }; status?: number } })?.response;
+      if (errorResponse?.data?.detail) {
+        setError(errorResponse.data.detail);
+      } else if (errorResponse?.status === 429) {
+        setError("Rate limit exceeded. Please try again later.");
+      } else {
+        setError("Failed to paraphrase text. Please try again.");
+      }
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleClear = () => {
     setInputText("");
     setOutputText("");
+    setError(null);
   };
 
   return (
@@ -162,6 +181,13 @@ export default function Home() {
             />
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
+            {error}
+          </div>
+        )}
 
         {/* Action Buttons (Mobile/Desktop) */}
         <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
