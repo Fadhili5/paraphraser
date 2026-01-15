@@ -1,5 +1,7 @@
+import json
 from fastapi import APIRouter, Request, Header, HTTPException
 import stripe
+from fastapi.responses import JSONResponse
 
 from app.config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 from app.db.connection import get_pool
@@ -7,9 +9,10 @@ from app.db.connection import get_pool
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 stripe.api_key = STRIPE_SECRET_KEY
+webhook_secret = STRIPE_WEBHOOK_SECRET
 
 
-@router.post("/stripe")
+@router.post("/stripe/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     payload = await request.body()
 
@@ -89,3 +92,43 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         return {"status": "downgraded"}
 
     return {"status": "ignored"}
+
+# Add a Subscription Web-Hook
+@router.post("/stripe/webhook")
+async def webhook_received(request: Request, stripe_signature: str | None = Header(default=None, alias="Stripe-Signature")):
+    payload = await request.body()
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(
+                payload=payload,
+                sig_header=stripe_signature,
+                secret=webhook_secret,
+            )
+        else:
+            event = json.loads(payload)
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid Signature")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    event_type = event["type"]
+    data_object = event["data"]["object"]
+    print(f"event {event_type}")
+
+    if event_type == "checkout.session.completed":
+        print("Payment Succeeded")
+    elif event_type == "customer.subscription.trial_will_end":
+        print("Subscription trial will end")
+    elif event_type == "customer.subscription.created":
+        print(f"Subscription Created: {event['id']}")
+    elif event_type == "customer.subscription.updated":
+        print(f"Subscription Updated: {event['id']}")
+    elif event_type == "customer.subscription.deleted":
+        print(f"Subscription Deleted: {event['id']}")
+    elif event_type == "entitlements.active_entitlement_summary.updated":
+        print(f"Active entitlement summary updated {event['id']}")
+
+    return JSONResponse({"status": "success"})
+
+
+"""todo: Implement webhooks and auditability
+setup webhooks for invoice.paid, invoice.payment_failed, customer_subscription.updated, charge.refunded"""
