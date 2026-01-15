@@ -1,14 +1,18 @@
 # fixed the dict vs int problem in this file
 
+import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
 
 from app.paraphrase.ml_model import generate_paraphrase
+
+logger = logging.getLogger(__name__)
 from app.paraphrase.doc_paraphraser import extract_text_from_file
 from app.auth.guard import paid_user
 from app.billing.usage_guard import usage_guard
 from app.billing.plans import PLAN_LIMITS
-from app.paraphrase.limits import MAX_FILE_SIZE_BYTES
+from app.paraphrase.limits import MAX_FILE_SIZE_BYTES, MAX_CHARACTERS
 
 router = APIRouter(prefix="/v1/paraphrase", tags=["Paraphrase"])
 
@@ -18,6 +22,53 @@ allowed_content_types = {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
+
+
+class ParaphraseRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=50000)
+    mode: str = Field(default="standard")
+
+
+class ParaphraseResponse(BaseModel):
+    paraphrased_text: str
+    original_length: int
+    paraphrased_length: int
+
+
+@router.post("", response_model=ParaphraseResponse)
+async def paraphrase_text(request: ParaphraseRequest):
+    """
+    Paraphrase text. Works for both authenticated and anonymous users.
+    Anonymous users are limited to MAX_CHARACTERS per request.
+    """
+    text = request.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Text cannot be empty",
+        )
+
+    if len(text) > MAX_CHARACTERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Text exceeds maximum allowed length of {MAX_CHARACTERS} characters",
+        )
+
+    try:
+        paraphrased_text = await run_in_threadpool(generate_paraphrase, text)
+    except Exception as e:
+        logger.exception(f"Paraphrasing failed for text length {len(text)}: {type(e).__name__}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Paraphrasing failed: {type(e).__name__}: {str(e)}",
+        )
+
+    return ParaphraseResponse(
+        paraphrased_text=paraphrased_text,
+        original_length=len(text),
+        paraphrased_length=len(paraphrased_text),
+    )
 
 
 @router.post("/document")
@@ -93,10 +144,11 @@ async def paraphrase_doc(
             generate_paraphrase,
             extracted_text,
         )
-    except Exception:
+    except Exception as e:
+        logger.exception(f"Document paraphrasing failed: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Paraphrasing failed",
+            detail=f"Paraphrasing failed: {type(e).__name__}: {str(e)}",
         )
 
     return {

@@ -12,7 +12,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 
-async def create_access_token(subject: dict, expires_delta: timedelta = timedelta(minutes=5)):
+def create_access_token(subject: dict, expires_delta: timedelta = timedelta(minutes=5)):
     to_encode = subject.copy()
     to_encode.update({"exp": datetime.utcnow() + expires_delta})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

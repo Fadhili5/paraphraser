@@ -28,8 +28,9 @@ async def get_current_user(
             detail="Invalid token payload",
         )
 
-    dao = UserDAO(db_pool)
-    user = await dao.get_by_id(user_id)
+    async with db_pool.acquire() as conn:
+        dao = UserDAO(conn)
+        user = await dao.get_by_id(user_id)
 
     if not user:
         raise HTTPException(
