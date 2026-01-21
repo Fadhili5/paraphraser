@@ -97,26 +97,93 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
 @router.post("/stripe/webhook")
 async def webhook_received(request: Request, stripe_signature: str | None = Header(default=None, alias="Stripe-Signature")):
     payload = await request.body()
+
     try:
         if webhook_secret:
+            if not stripe_signature:
+                raise HTTPException(status_code=400, detail="Missing Stripe-Signature")
+
             event = stripe.Webhook.construct_event(
                 payload=payload,
                 sig_header=stripe_signature,
                 secret=webhook_secret,
             )
         else:
-            event = json.loads(payload)
+            event = json.loads(payload.decode("utf-8"))
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid Signature")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    pool = await get_pool()
     event_type = event["type"]
-    data_object = event["data"]["object"]
+    data = event["data"]["object"]
+
     print(f"event {event_type}")
 
+    # Successful checkout
     if event_type == "checkout.session.completed":
-        print("Payment Succeeded")
-    elif event_type == "customer.subscription.trial_will_end":
+        metadata = data.get("metadata") or {}
+        user_id = metadata.get("user_id")
+        plan = metadata.get("plan")
+
+        if not user_id or not plan:
+            return {"status": "missing_metadata"}
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE users
+                SET plan = $1,
+                    subscription_status = 'active'
+                WHERE id = $2
+                """,
+                plan,
+                user_id,
+            )
+
+        return {"status": "upgraded"}
+
+    # For failed payments: subscription removal
+    if event_type in {
+        "payment_intent.payment_failed",
+        "invoice.payment_failed",
+        "customer.subscription.deleted",
+    }:
+        metadata = data.get("metadata") or {}
+        user_id = metadata.get("user_id")
+
+        async with pool.acquire() as conn:
+            # Fallback via Stripe customer ID
+            if not user_id and data.get("customer"):
+                row = await conn.fetchrow(
+                    """
+                    SELECT id
+                    FROM users
+                    WHERE stripe_customer_id = $1
+                    """,
+                    data["customer"],
+                )
+                if row:
+                    user_id = row["id"]
+
+            if not user_id:
+                return {"status": "user_not_found"}
+
+            await conn.execute(
+                """
+                UPDATE users
+                SET plan = 'free',
+                    subscription_status = 'inactive'
+                WHERE id = $1
+                """,
+                user_id,
+            )
+
+        return {"status": "downgraded"}
+
+    # Informational events
+    if event_type == "customer.subscription.trial_will_end":
         print("Subscription trial will end")
     elif event_type == "customer.subscription.created":
         print(f"Subscription Created: {event['id']}")
@@ -128,7 +195,3 @@ async def webhook_received(request: Request, stripe_signature: str | None = Head
         print(f"Active entitlement summary updated {event['id']}")
 
     return JSONResponse({"status": "success"})
-
-
-"""todo: Implement webhooks and auditability
-setup webhooks for invoice.paid, invoice.payment_failed, customer_subscription.updated, charge.refunded"""
