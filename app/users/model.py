@@ -1,15 +1,14 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional
-from datetime import datetime
+from pydantic import BaseModel, ConfigDict
 
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+import uuid
 
 
 class UserDB(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: str
+    id: uuid.UUID
     username: str
     email: EmailStr
 
@@ -25,7 +24,7 @@ class UserDB(BaseModel):
 
 
 class UserPublic(BaseModel):
-    id: str
+    id: uuid.UUID
     username: str
     email: EmailStr
     phone_number: Optional[str]
@@ -45,7 +44,7 @@ class UserLoginRequest(BaseModel):
 
 class UserRegisterResponse(BaseModel):
     message: str
-    user_id: str
+    user_id: uuid.UUID
 
 
 class TokenResponse(BaseModel):

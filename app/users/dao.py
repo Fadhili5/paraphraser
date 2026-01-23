@@ -1,5 +1,6 @@
 from typing import Optional
 import asyncpg
+import uuid
 from app.users.model import UserDB
 
 
@@ -18,7 +19,7 @@ class UserDAO:
         )
         return UserDB(**dict(row)) if row else None
 
-    async def get_by_id(self, user_id: str) -> Optional[UserDB]:
+    async def get_by_id(self, user_id: uuid.UUID) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
             """
             SELECT id, username, email, password, phone_number, role
