@@ -1,13 +1,14 @@
 import uuid
-import logging
 from fastapi import HTTPException, status
 
 from app.users.dao import UserDAO
-from app.auth.password_handler import (validate_password_strength, hash_password, verify_password)
+from app.auth.password_handler import (
+    validate_password_strength,
+    hash_password,
+    verify_password,
+)
 from app.auth.jwt import create_access_token
 from app.users.model import UserRegisterResponse, TokenResponse
-
-logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -19,8 +20,9 @@ class UserService:
         else:
             raise ValueError("UserService requires either dao or db_pool")
 
-    async def register_user(self, email: str, password: str, phone: str, username: str):
-        # 1. Password validation with proper error propagation
+    async def register_user(self, email: str, password: str, phone: str, username: str) -> UserRegisterResponse:
+
+        # 1. Validate password strength
         try:
             validate_password_strength(password)
         except ValueError as e:
@@ -41,10 +43,10 @@ class UserService:
             )
 
         # 3. Create user
-        user_id = str(uuid.uuid4())[:8]
+        user_id = str(uuid.uuid4())  # UUID expected by DB
         hashed_password = hash_password(password)
 
-        created_id = await self.dao.create_user(
+        created_user_id = await self.dao.create_user(
             user_id=user_id,
             username=username,
             email=email,
@@ -53,25 +55,22 @@ class UserService:
         )
 
         return UserRegisterResponse(
-            message="User Account successfully created!",
-            user_id=created_id,
+            message="User account successfully created",
+            user_id=created_user_id,
         )
 
-    async def user_login(self, email: str, password: str):
+    async def user_login(self, email: str, password: str) -> TokenResponse:
         user = await self.dao.get_by_email(email)
 
-        if not user:
+        if not user or not verify_password(password, user.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
             )
 
-        if not verify_password(password, user.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-            )
+        access_token = create_access_token(
+            subject={"sub": str(user.id)}
+            #payload={"user_id": user.id}
+        )
 
-        token = create_access_token({"user_id": user.id})
-
-        return TokenResponse(access_token=token)
+        return TokenResponse(access_token=access_token)
