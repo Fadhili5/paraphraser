@@ -6,7 +6,11 @@ from starlette import status
 RECAPTCHA_SECRET = os.getenv("RECAPTCHA_SECRET")
 
 if not RECAPTCHA_SECRET:
-    raise RuntimeError("RECAPTCHA_SECRET not set")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Captcha service not configured"
+    )
+    #raise RuntimeError("RECAPTCHA_SECRET not set")
 
 def guard_captcha(token: str, expected_action: str, min_score: float = 0.5):
     try:
