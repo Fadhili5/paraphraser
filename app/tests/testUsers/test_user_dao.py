@@ -1,6 +1,7 @@
-from app.users.dao import UserDAO
+import uuid
 import pytest
 from unittest.mock import AsyncMock
+from app.users.dao import UserDAO
 from app.users.model import UserDB
 
 
@@ -8,9 +9,11 @@ from app.users.model import UserDB
 def mock_conn():
     return AsyncMock()
 
+
 @pytest.fixture
 def user_dao(mock_conn):
     return UserDAO(mock_conn)
+
 
 @pytest.mark.asyncio
 async def test_create_user(user_dao, mock_conn):
@@ -20,81 +23,105 @@ async def test_create_user(user_dao, mock_conn):
         user_id="userX24",
         username="developer",
         email="developer@example.com",
-        phone="0783434834",
         hashed_password="hashed",
-        role="user"
+        phone="0783434834",
+        role="user",
     )
 
     mock_conn.fetchrow.assert_awaited_once()
     assert user_id == "userX24"
 
+
 @pytest.mark.asyncio
 async def test_get_by_email_found(user_dao, mock_conn):
     row = {
-        "id": "user01",
+        "id": uuid.uuid4(),
         "username": "dev",
         "email": "dev@example.com",
+        "password": "hashed",
+        "phone_number": "0783434834",
+        "role": "user",
     }
     mock_conn.fetchrow.return_value = row
 
     result = await user_dao.get_by_email("dev@example.com")
+
     mock_conn.fetchrow.assert_awaited_once()
     assert isinstance(result, UserDB)
-    assert result.id == "user01"
     assert result.username == "dev"
+    assert result.email == "dev@example.com"
+
 
 @pytest.mark.asyncio
 async def test_get_by_email_not_found(user_dao, mock_conn):
     mock_conn.fetchrow.return_value = None
+
     result = await user_dao.get_by_email("missinguser@example.com")
+
     assert result is None
+
 
 @pytest.mark.asyncio
 async def test_get_by_id_found(user_dao, mock_conn):
+    user_id = uuid.uuid4()
     row = {
-        "id": "user02",
+        "id": user_id,
         "username": "anotherdev",
-        "email": "anotherdev@example.com"
+        "email": "anotherdev@example.com",
+        "password": "hashed",
+        "phone_number": "0783434834",
+        "role": "user",
     }
-
     mock_conn.fetchrow.return_value = row
 
-    result = await user_dao.get_by_id("user02")
+    result = await user_dao.get_by_id(user_id)
+
     mock_conn.fetchrow.assert_awaited_once()
     assert isinstance(result, UserDB)
+    assert result.id == user_id
     assert result.username == "anotherdev"
-    assert result.email == "anotherdev@example.com"
+
 
 @pytest.mark.asyncio
 async def test_get_by_id_not_found(user_dao, mock_conn):
     mock_conn.fetchrow.return_value = None
-    result = await user_dao.get_by_id("missingdev")
+
+    result = await user_dao.get_by_id(uuid.uuid4())
+
     assert result is None
+
 
 @pytest.mark.asyncio
 async def test_get_by_email_and_username_found(user_dao, mock_conn):
     row = {
-        "id": "user03",
+        "id": uuid.uuid4(),
         "username": "andanotherdev",
         "email": "another@example.com",
-        "phone": "0783434834",
-        "role": "user"
+        "phone_number": "0783434834",
+        "role": "user",
     }
-
     mock_conn.fetchrow.return_value = row
 
-    result = await user_dao.get_by_email_and_username("andanotherdev", "andanotherdev")
+    result = await user_dao.get_by_email_and_username(
+        email="another@example.com",
+        username="andanotherdev",
+    )
 
     mock_conn.fetchrow.assert_awaited_once()
     assert isinstance(result, UserDB)
-    assert result.id == "user03"
-    assert result.email == "another@example.com"
     assert result.username == "andanotherdev"
-    assert result.phone == "0783434834"
+    assert result.email == "another@example.com"
+    assert result.phone_number == "0783434834"
     assert result.role == "user"
+
 
 @pytest.mark.asyncio
 async def test_get_by_email_and_username_not_found(user_dao, mock_conn):
     mock_conn.fetchrow.return_value = None
-    result = await user_dao.get_by_email_and_username("andanotherdev", "missinguser")
+
+    result = await user_dao.get_by_email_and_username(
+        email="missing@example.com",
+        username="missinguser",
+    )
+
     assert result is None

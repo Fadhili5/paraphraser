@@ -14,7 +14,7 @@ class UserDB(BaseModel):
 
     # Change the requirements to optional
     password: Optional[str] = None
-    phone: Optional[str] = None
+    phone_number: Optional[str] = None
     role: Optional[str] = None
     created_at: Optional[datetime] = None
 
@@ -34,7 +34,7 @@ class UserRegisterRequest(BaseModel):
     username: str
     email: str
     password: str
-    phone: str
+    phone_number: str
     recaptcha_token: str
 
 class UserLoginRequest(BaseModel):

@@ -11,7 +11,7 @@ class UserDAO:
     async def get_by_email(self, email: str) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
             """
-            SELECT id, username, email, password, phone_number, role
+            SELECT id, username, email, phone_number, role
             FROM users
             WHERE email = $1
             """,
@@ -22,7 +22,7 @@ class UserDAO:
     async def get_by_id(self, user_id: uuid.UUID) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
             """
-            SELECT id, username, email, password, phone_number, role
+            SELECT id, username, email, phone_number, role
             FROM users
             WHERE id = $1
             """,
