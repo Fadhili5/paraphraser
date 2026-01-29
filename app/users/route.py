@@ -20,7 +20,7 @@ async def register_user(request: Request, payload: UserRegisterRequest, db_pool:
             email=payload.email,
             username=payload.username,
             password=payload.password,
-            phone=payload.phone_number,
+            phone_number=payload.phone_number,
         )
 
 @router.post("/login", response_model=TokenResponse)

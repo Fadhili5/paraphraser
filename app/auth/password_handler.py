@@ -1,43 +1,43 @@
-import hashlib
 from passlib.context import CryptContext
 import re
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing configuration
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
-# Validation constant
-MIN_PASSWORD_LENGTH = 8
+DUMMY_PASSWORD_HASH = pwd_context.hash("dummy-password-for-timing")
 
-def normalize_password(password: str) -> bytes:
-    """Normalize password to a fixed length byte string
-    This curbs bcrypt to see more than 72 bytes."""
-    return hashlib.sha256(password.encode()).digest()
+# Validation constants
+MIN_PASSWORD_LENGTH = 12
+MAX_PASSWORD_LENGTH = 128  # protects against DoS and absurd inputs
 
 
 def validate_password_strength(password: str) -> None:
-    # Raise an error if password is weak
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise ValueError("Password is too short!")
+    #Validates password strength.
 
-    # Optionally check for digits, uppercase, lowercase, special characters
+    if not isinstance(password, str):
+        raise ValueError("Password must be a string")
+
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError("Password is too short")
+
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValueError("Password is too long")
+
+    # Optional light composition checks
+    # These discourage trivial passwords without enforcing brittle rules
+    if not re.search(r"[a-zA-Z]", password):
+        raise ValueError("Password must contain at least one letter")
+
     if not re.search(r"\d", password):
         raise ValueError("Password must contain at least one digit")
-    if not re.search(r"[A-Z]", password):
-        raise ValueError("Password must contain at least one uppercase letter")
-    if not re.search(r"[a-z]", password):
-        raise ValueError("Password must contain at least one lowercase letter")
-    if not re.search(r"[!@#$%^&*()\[\]?<>]", password):
-        raise ValueError("Password must contain at least one special character")
 
 
 def hash_password(password: str) -> str:
-    # Validate a password then hash it
+    # Validates and hashes a password for storage.
     validate_password_strength(password)
-    normalized = normalize_password(password)
-    return pwd_context.hash(normalized)
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # compare the stored password with the user's password
-    normalized = normalize_password(plain_password)
-    return pwd_context.verify(normalized, hashed_password)
+    # Verifies a plaintext password against a stored hash.
     return pwd_context.verify(plain_password, hashed_password)

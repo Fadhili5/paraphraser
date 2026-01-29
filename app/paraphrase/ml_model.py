@@ -3,7 +3,7 @@ from typing import Optional, Tuple, List
 import threading
 import torch
 
-MODEL_NAME = "ramsrigouthamg/t5_paraphraser"
+MODEL_NAME = "tuner007/pegasus_paraphrase"
 
 _tokenizer: Optional[PreTrainedTokenizer] = None
 _model: Optional[PreTrainedModel] = None

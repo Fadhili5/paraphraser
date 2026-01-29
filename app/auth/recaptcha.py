@@ -4,6 +4,13 @@ from fastapi import HTTPException
 from starlette import status
 
 def guard_captcha(token: str, expected_action: str, min_score: float = 0.5):
+    env = os.getenv("ENV", "development")
+
+    if env == "development":
+        return {
+            "score": 1.0,
+            "action": expected_action,
+        }
     secret = os.getenv("RECAPTCHA_SECRET")
 
     if not secret:

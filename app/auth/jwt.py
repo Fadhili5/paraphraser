@@ -11,12 +11,20 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-def create_access_token(subject: dict, expires_delta: timedelta = timedelta(minutes=5)):
-    to_encode = subject.copy()
-    to_encode.update({"exp": datetime.utcnow() + expires_delta})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+def create_access_token(subject: str, expires_delta: timedelta | None = None):
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    to_encode = {
+        "sub": subject,
+        "exp": expire,
+    }
+
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 async def get_current_user(request: Request):

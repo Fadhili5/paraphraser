@@ -2,11 +2,7 @@ import uuid
 from fastapi import HTTPException, status
 
 from app.users.dao import UserDAO
-from app.auth.password_handler import (
-    validate_password_strength,
-    hash_password,
-    verify_password,
-)
+from app.auth.password_handler import hash_password, verify_password, DUMMY_PASSWORD_HASH
 from app.auth.jwt import create_access_token
 from app.users.model import UserRegisterResponse, TokenResponse
 
@@ -20,18 +16,13 @@ class UserService:
         else:
             raise ValueError("UserService requires either dao or db_pool")
 
-    async def register_user(self, email: str, password: str, phone: str, username: str) -> UserRegisterResponse:
+    async def register_user(self, email: str, password: str, phone_number: str, username: str) -> UserRegisterResponse:
 
-        # 1. Validate password strength
-        try:
-            validate_password_strength(password)
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(e),
-            )
+        # Normalize inputs
+        email = email.strip().lower()
+        username = username.strip()
 
-        # 2. Check for existing user
+        # 1. Check if user already exists
         existing = await self.dao.get_by_email_and_username(
             email=email,
             username=username,
@@ -42,17 +33,31 @@ class UserService:
                 detail="User already exists",
             )
 
+        # 2. Hash password (includes validation)
+        try:
+            hashed_password = hash_password(password)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e),
+            )
+
         # 3. Create user
-        user_id = str(uuid.uuid4())  # UUID expected by DB
-        hashed_password = hash_password(password)
+        user_id = str(uuid.uuid4())
 
         created_user_id = await self.dao.create_user(
             user_id=user_id,
             username=username,
             email=email,
             hashed_password=hashed_password,
-            phone=phone,
+            phone_number=phone_number
         )
+
+        if not created_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User creation failed",
+            )
 
         return UserRegisterResponse(
             message="User account successfully created",
@@ -60,17 +65,28 @@ class UserService:
         )
 
     async def user_login(self, email: str, password: str) -> TokenResponse:
+        email = email.strip().lower()
+
         user = await self.dao.get_by_email(email)
 
-        if not user or not verify_password(password, user.password):
+        # Fake hash to normalize timing if user does not exist
+        fake_hash = (
+            "$argon2id$v=19$m=65536,t=3,p=4$"
+            "c29tZXNhbHQ$"
+            "c29tZWhhc2g"
+        )
+
+        password_hash = user.password if user and user.password else DUMMY_PASSWORD_HASH
+
+        if not user or not verify_password(password, password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
             )
 
         access_token = create_access_token(
-            subject={"sub": str(user.id)}
-            #payload={"user_id": user.id}
+            subject=str(user.id)  # sub is now correctly a string
         )
 
         return TokenResponse(access_token=access_token)
+
