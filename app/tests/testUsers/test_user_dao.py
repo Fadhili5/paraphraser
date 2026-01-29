@@ -24,7 +24,7 @@ async def test_create_user(user_dao, mock_conn):
         username="developer",
         email="developer@example.com",
         hashed_password="hashed",
-        phone="0783434834",
+        phone_number="0783434834",
         role="user",
     )
 

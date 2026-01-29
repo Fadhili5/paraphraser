@@ -11,7 +11,7 @@ class UserDAO:
     async def get_by_email(self, email: str) -> Optional[UserDB]:
         row = await self.conn.fetchrow(
             """
-            SELECT id, username, email, phone_number, role
+            SELECT id, username, email, password, phone_number, role
             FROM users
             WHERE email = $1
             """,
@@ -42,7 +42,7 @@ class UserDAO:
         )
         return UserDB(**dict(row)) if row else None
 
-    async def create_user(self, user_id: str, username: str, email: str, hashed_password: str, phone: str, role: str = "user") -> str:
+    async def create_user(self, user_id: str, username: str, email: str, hashed_password: str, phone_number: str, role: str = "user") -> str:
         row = await self.conn.fetchrow(
             """
             INSERT INTO users (id, username, email, password, phone_number, role)
@@ -53,7 +53,7 @@ class UserDAO:
             username,
             email,
             hashed_password,
-            phone,
+            phone_number,
             role,
         )
         return row["id"]
