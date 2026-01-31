@@ -13,6 +13,7 @@ async def init_db_pool():
     global db_pool
     db_pool = await asyncpg.create_pool(
         dsn=_get_asyncpg_dsn(),
+        ssl="require",
         min_size=1,
         max_size=10
     )
