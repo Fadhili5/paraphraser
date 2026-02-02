@@ -8,6 +8,12 @@ db_pool = None
 async def init_db_pool():
     global db_pool
 
+    db_url = settings.DATABASE_URL
+
+    import re
+    safe_url = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', db_url)
+    print(f"Attempting to connect to {safe_url}")
+
     try:
         db_pool = await asyncpg.create_pool(
             dsn=settings.DATABASE_URL,
@@ -17,6 +23,7 @@ async def init_db_pool():
             timeout=30,
             command_timeout=10
         )
+        print("DATABASE_URL seen by app:", settings.DATABASE_URL)
         print("Database pool initialized successfully")
     except Exception as e:
         print(f"Failed to initialize database pool: {e}")
