@@ -27,7 +27,7 @@ def health():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://paraphraser-six.vercel.app/",
+        "https://paraphraser-six.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
