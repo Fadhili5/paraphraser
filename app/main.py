@@ -17,7 +17,6 @@ async def lifespan(app: FastAPI):
     # Shutdown
     await close_db_pool(app)
 
-
 app = FastAPI(
     title="AI Paraphraser API",
     version="1.0.0",
