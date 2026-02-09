@@ -12,11 +12,10 @@ from app.db.schema import create_tables
 async def lifespan(app: FastAPI):
     # Startup
     await init_db_pool(app)
-    await create_tables()
+    await create_tables(app)
     yield
     # Shutdown
     await close_db_pool(app)
-
 
 app = FastAPI(
     title="AI Paraphraser API",
