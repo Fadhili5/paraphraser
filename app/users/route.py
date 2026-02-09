@@ -10,7 +10,7 @@ from app.auth.recaptcha import guard_captcha
 router = APIRouter(prefix="/v1/users", tags=["Users"])
 
 @router.post("/register", response_model=UserRegisterResponse, status_code=201)
-@rate_limit(limit=5, window=60)
+@rate_limit()
 async def register_user(request: Request, payload: UserRegisterRequest, db_pool: asyncpg.pool.Pool = Depends(get_pool)):
     guard_captcha(token=payload.recaptcha_token, expected_action="register", min_score=0.5)
     async with db_pool.acquire() as conn:

@@ -4,15 +4,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ex_router import api_router
-from app.db.connection import init_db_pool
+from app.db.connection import init_db_pool, close_db_pool
 from app.db.schema import create_tables
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db_pool()
+    # Startup
+    await init_db_pool(app)
     await create_tables()
     yield
-    #await close_db_pool()
+    # Shutdown
+    await close_db_pool(app)
+
 
 app = FastAPI(
     title="AI Paraphraser API",
@@ -20,9 +24,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 @app.get("/")
-def health():
+async def health():
     return {"status": "ok"}
+
 
 app.add_middleware(
     CORSMiddleware,
