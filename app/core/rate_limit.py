@@ -1,5 +1,5 @@
 import time
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Response
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 from functools import wraps
 from collections import defaultdict
@@ -52,6 +52,9 @@ def rate_limit(limit: int = 5, window: int = 60):
 
             if request is None:
                 raise RuntimeError("Request object not found in endpoint")
+
+            if request.method == "OPTIONS":
+                return Response(status_code=204)
 
             user = getattr(request.state, "user", None)
             if user:

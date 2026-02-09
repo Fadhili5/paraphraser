@@ -5,8 +5,7 @@ from app.core.config import settings
 db_pool = None
 
 
-async def init_db_pool():
-    global db_pool
+async def init_db_pool(app):
 
     db_url = settings.DATABASE_URL
 
@@ -15,7 +14,7 @@ async def init_db_pool():
     print(f"Attempting to connect to {safe_url}")
 
     try:
-        db_pool = await asyncpg.create_pool(
+        app.state.db_pool = await asyncpg.create_pool(
             dsn=settings.DATABASE_URL,
             ssl='prefer',  # Changed from "require" string
             min_size=1,
@@ -30,12 +29,10 @@ async def init_db_pool():
         raise
 
 
-async def close_db_pool():
-    global db_pool
-    if db_pool:
-        await db_pool.close()
-        db_pool = None
-
+async def close_db_pool(app):
+    pool = getattr(app.state, "db_pool", None)
+    if pool:
+        await pool.close()
 
 async def get_pool():
     if db_pool is None:
