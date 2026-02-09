@@ -24,12 +24,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
-@app.get("/")
-async def health():
-    return {"status": "ok"}
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -40,5 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def health():
+    return {"status": "ok"}
 
 app.include_router(api_router)

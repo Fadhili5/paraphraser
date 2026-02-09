@@ -5,7 +5,7 @@ export interface UserRegisterRequest {
   username: string;
   email: string;
   password: string;
-  phone: string;
+  phone_number: string;
   recaptcha_token: string;
 }
 
@@ -53,7 +53,7 @@ export interface UserPublic {
   id: string;
   username: string;
   email: string;
-  phone?: string;
+  phone_number?: string;
   role: string;
 }
 

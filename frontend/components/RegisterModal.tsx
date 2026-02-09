@@ -129,7 +129,7 @@ export default function RegisterModal({
         username: data.username,
         email: data.email,
         password: data.password,
-        phone: data.phone_number,
+        phone_number: data.phone_number,
         recaptcha_token: recaptchaToken,
       });
 
