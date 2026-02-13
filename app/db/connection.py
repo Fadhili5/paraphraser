@@ -30,7 +30,7 @@ async def init_db_pool(app):
 
 
 async def get_pool(app):
-    pool = getattr(app.state.db_pool, "db_pool", None)
+    pool = getattr(app.state, "db_pool", None)
     if pool is None:
         raise RuntimeError("Database pool not initialized")
     return pool
