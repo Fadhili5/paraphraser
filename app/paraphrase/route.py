@@ -3,9 +3,9 @@
 import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
 
 from app.paraphrase.ml_model import generate_paraphrase
+from app.paraphrase.paraphrase_schema import ParaphraseRequest, ParaphraseResponse
 
 logger = logging.getLogger(__name__)
 from app.paraphrase.doc_paraphraser import extract_text_from_file
@@ -23,24 +23,8 @@ allowed_content_types = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
-
-class ParaphraseRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=50000)
-    mode: str = Field(default="standard")
-
-
-class ParaphraseResponse(BaseModel):
-    paraphrased_text: str
-    original_length: int
-    paraphrased_length: int
-
-
 @router.post("", response_model=ParaphraseResponse)
 async def paraphrase_text(request: ParaphraseRequest):
-    """
-    Paraphrase text. Works for both authenticated and anonymous users.
-    Anonymous users are limited to MAX_CHARACTERS per request.
-    """
     text = request.text.strip()
 
     if not text:
@@ -56,12 +40,19 @@ async def paraphrase_text(request: ParaphraseRequest):
         )
 
     try:
-        paraphrased_text = await run_in_threadpool(generate_paraphrase, text)
+        paraphrased_text = await run_in_threadpool(
+            generate_paraphrase,
+            text,
+            request.mode
+        )
     except Exception as e:
-        logger.exception(f"Paraphrasing failed for text length {len(text)}: {type(e).__name__}: {str(e)}")
+        logger.exception(
+            f"Paraphrasing failed for text length {len(text)}: "
+            f"{type(e).__name__}: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Paraphrasing failed: {type(e).__name__}: {str(e)}",
+            detail="Paraphrasing failed",
         )
 
     return ParaphraseResponse(
