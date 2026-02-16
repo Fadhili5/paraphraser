@@ -3,8 +3,8 @@ from typing import Optional, Tuple, List
 import threading
 import torch
 
-#MODEL_NAME = "tuner007/pegasus_paraphrase"
-MODEL_NAME = "google/long-t5-tglobal-base"
+MODEL_NAME = "tuner007/pegasus_paraphrase"
+#MODEL_NAME = "google/long-t5-tglobal-base"
 
 _tokenizer: Optional[PreTrainedTokenizer] = None
 _model: Optional[PreTrainedModel] = None
@@ -33,8 +33,8 @@ def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 10) -> List[
     # Leave room for "paraphrase: " and special tokens
     safe_max_tokens = max_positions - buffer
 
-    inputs = tokenizer(text, return_tensors="pt", tructation=False)
-    input_ids = input["input_ids"][0]
+    inputs = tokenizer(text, return_tensors="pt", truncation=False)
+    input_ids = inputs["input_ids"][0]
 
     chunks = []
     for i in range(0, len(input_ids), safe_max_tokens):
@@ -45,7 +45,7 @@ def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 10) -> List[
 
     return chunks
 
-def paraphrase_chunk(text: str) -> str:
+def paraphrase_chunk(text: str, mode) -> str:
     tokenizer, model, device = load_model()
 
     prompt = f"paraphrase: {text} </s>"
@@ -79,10 +79,11 @@ def paraphrase_chunk(text: str) -> str:
 
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-def generate_paraphrase(text: str) -> str:
+
+def generate_paraphrase(text: str, mode: str = "standard") -> str:
     tokenizer, model, _ = load_model()
 
     chunks = chunk_text_by_tokens(text, tokenizer, model)
-    paraphrased_chunks = [paraphrase_chunk(chunk) for chunk in chunks]
+    paraphrased_chunks = [paraphrase_chunk(chunk, mode) for chunk in chunks]
 
     return "\n\n".join(paraphrased_chunks)
