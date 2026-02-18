@@ -11,6 +11,80 @@ _model: Optional[PreTrainedModel] = None
 _lock = threading.Lock()
 _device: Optional[torch.device] = None
 
+#MODE CONFIGURATION
+MODE_CONFIG = {
+    "standard": {
+        "prompt": "paraphrase:",
+        "generate_args": {
+            "num_beams": 5,
+            "repetition_penalty": 1.2,
+            "early_stopping": True,
+        }
+    },
+    "word_changer": {
+        "prompt": "lightly paraphrase with minimal changes:",
+        "generate_args": {
+            "num_beams": 5,
+            "repetition_penalty": 1.2,
+            "early_stopping": True,
+        }
+    },
+    "fluency": {
+        "prompt": "improve the fluency of:",
+        "generate_args": {
+            "num_beams": 5,
+            "repetition_penalty": 1.2,
+        }
+    },
+    "formal": {
+        "prompt": "rewrite in a formal tone:",
+        "generate_args": {
+            "num_beams": 5,
+        }
+    },
+    "academic": {
+        "prompt": "rewrite in academic tone:",
+        "generate_args": {
+            "num_beams": 5,
+        }
+    },
+    "creative": {
+        "prompt": "rewrite creatively:",
+        "generate_args": {
+            "do_sample": True,
+            "top_p": 0.9,
+            "temperature": 0.9,
+            "repetition_penalty": 1.2,
+        }
+    },
+    "smooth": {
+        "prompt": "make this smoother and more natural:",
+        "generate_args": {
+            "num_beams": 5
+        }
+    },
+    "smarter": {
+        "prompt": "rewrite to sound more intelligent:",
+        "generate_args": {
+            "num_beams": 5,
+        }
+    },
+    "shorten": {
+        "prompt": "summarize:",
+        "generate_args": {
+            "num_beams": 5,
+            "max_new_tokens": 120,
+        }
+    },
+    "expand": {
+        "prompt": "expand and elaborate:",
+        "generate_args": {
+            "num_beams": 5,
+            "max_new_tokens": 400,
+        }
+    },
+}
+
 def load_model() -> Tuple[PreTrainedTokenizer, PreTrainedModel, torch.device]:
     global _tokenizer, _model, _device
 
@@ -27,10 +101,8 @@ def load_model() -> Tuple[PreTrainedTokenizer, PreTrainedModel, torch.device]:
 
     return _tokenizer, _model, _device
 
-def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 10) -> List[str]:
+def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 20) -> List[str]:
     max_positions = model.config.max_position_embeddings
-
-    # Leave room for "paraphrase: " and special tokens
     safe_max_tokens = max_positions - buffer
 
     inputs = tokenizer(text, return_tensors="pt", truncation=False)
@@ -48,6 +120,11 @@ def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 10) -> List[
 def paraphrase_chunk(text: str, mode) -> str:
     tokenizer, model, device = load_model()
 
+    if mode not in MODE_CONFIG:
+        raise ValueError(f"Invalid Mode '{mode}. Available modes: {List(MODE_CONFIG.keys())}")
+
+    config = MODE_CONFIG[mode]
+
     prompt = f"paraphrase: {text} </s>"
     #inputs = tokenizer.encode_plus(
     #    prompt,
@@ -59,23 +136,33 @@ def paraphrase_chunk(text: str, mode) -> str:
         prompt,
         return_tensors="pt",
         truncation=True,
-        max_length=512,
+        max_length=model.config.max_position_embeddings
+        #max_length=512,
     )
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
+    generate_args = {
+        "input_ids": inputs["input_ids"],
+        "attention_mask": inputs["attention_mask"],
+        "max_new_tokens": config["generate_args"].get("max_new_tokens", 256),
+        **config["generate_args"],
+    }
+
     with torch.no_grad():
-        outputs = model.generate(
-            input_ids=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
-            max_length=256,
-            num_beams=5,
-            #temperature=1.5,
-            #top_k=50,
-            #top_p=0.95,
-            repetition_penalty=1.2,
-            do_sample=True,
-            early_stopping=True
-        )
+        outputs = model.generate(**generate_args)
+
+        #outputs = model.generate(
+        #    input_ids=inputs["input_ids"],
+        #    attention_mask=inputs["attention_mask"],
+        #    max_length=256,
+        #    num_beams=5,
+        #    #temperature=1.5,
+        #    #top_k=50,
+        #    #top_p=0.95,
+        #    repetition_penalty=1.2,
+        #    do_sample=True,
+        #    early_stopping=True
+        #)
 
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
