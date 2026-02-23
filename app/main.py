@@ -28,6 +28,7 @@ app.add_middleware(
     allow_origins=[
         "https://paraphraser-six.vercel.app",
         "http://localhost:3000",
+        "https://paraphraser-264w.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
