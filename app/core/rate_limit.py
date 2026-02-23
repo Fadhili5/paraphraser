@@ -1,33 +1,62 @@
+import asyncio
 import time
+from contextlib import asynccontextmanager
+from functools import wraps
+
 from fastapi import Request, HTTPException, Response
 from starlette.status import HTTP_429_TOO_MANY_REQUESTS
-from functools import wraps
-from collections import defaultdict
 
 from app.core.config import settings
 
 
 class RateLimiter:
-    def __init__(self):
+    def __init__(self, cleanup_interval: int = 300):
         # key -> (count, expiry_timestamp)
-        self.storage: dict[str, tuple[int, float]] = defaultdict(lambda: (0, 0.0))
+        self.storage: dict[str, tuple[int, float]] = {}
+        self._cleanup_interval = cleanup_interval
+        self._cleanup_task: asyncio.Task | None = None
+        self._lock = asyncio.Lock()
 
-    async def hit(self, key: str, limit: int, window: int):
+    def start(self):
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+    def stop(self):
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            self._cleanup_task = None
+
+    async def _cleanup_loop(self):
+        while True:
+            await asyncio.sleep(self._cleanup_interval)
+            now = time.time()
+            async with self._lock:
+                expired = [k for k, (_, expiry) in self.storage.items() if now > expiry]
+                for k in expired:
+                    del self.storage[k]
+
+    async def hit(self, key: str, limit: int, window: int) -> tuple[int, int]:
         now = time.time()
-        count, expiry = self.storage[key]
+        async with self._lock:
+            count, expiry = self.storage.get(key, (0, 0.0))
 
-        # reset window if expired
-        if now > expiry:
-            count = 0
-            expiry = now + window
+            if now > expiry:
+                count = 0
+                expiry = now + window
 
-        count += 1
-        self.storage[key] = (count, expiry)
+            count += 1
+            self.storage[key] = (count, expiry)
 
         return count, int(expiry - now)
 
 
 limiter = RateLimiter()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    limiter.start()
+    yield
+    limiter.stop()
 
 
 def rate_limit(limit: int = 5, window: int = 60):
