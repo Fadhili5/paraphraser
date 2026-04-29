@@ -10,81 +10,30 @@ _model: Optional[PreTrainedModel] = None
 _lock = threading.Lock()
 _device: Optional[torch.device] = None
 
-# MODE CONFIGURATION
+# Limits not to trust hugging face
+MAX_MODEL_TOKENS = 60
+DEFAULT_MAX_NEW_TOKENS = 128
+
+# Safety guards
+MAX_INPUT_CHARS = 3000
+MAX_CHUNKS = 6
+
+# MODE CONFIGURATION (reduced beams to save memory)
 MODE_CONFIG = {
-    "standard": {
-        "prompt": "paraphrase:",
-        "generate_args": {
-            "num_beams": 5,
-            "repetition_penalty": 1.2,
-            "early_stopping": True,
-        }
-    },
-    "word_changer": {
-        "prompt": "lightly paraphrase with minimal changes:",
-        "generate_args": {
-            "num_beams": 5,
-            "repetition_penalty": 1.2,
-            "early_stopping": True,
-        }
-    },
-    "fluency": {
-        "prompt": "improve the fluency of:",
-        "generate_args": {
-            "num_beams": 5,
-            "repetition_penalty": 1.2,
-        }
-    },
-    "formal": {
-        "prompt": "rewrite in a formal tone:",
-        "generate_args": {
-            "num_beams": 5,
-        }
-    },
-    "academic": {
-        "prompt": "rewrite in academic tone:",
-        "generate_args": {
-            "num_beams": 5,
-        }
-    },
+    "standard": {"prompt": "paraphrase:", "generate_args": {"num_beams": 2, "repetition_penalty": 1.2}},
+    "word_changer": {"prompt": "lightly paraphrase with minimal changes:", "generate_args": {"num_beams": 2}},
+    "fluency": {"prompt": "improve the fluency of:", "generate_args": {"num_beams": 2}},
+    "formal": {"prompt": "rewrite in a formal tone:", "generate_args": {"num_beams": 2}},
+    "academic": {"prompt": "rewrite in academic tone:", "generate_args": {"num_beams": 2}},
     "creative": {
         "prompt": "rewrite creatively:",
-        "generate_args": {
-            "do_sample": True,
-            "top_p": 0.9,
-            "temperature": 0.9,
-            "repetition_penalty": 1.2,
-        }
+        "generate_args": {"do_sample": True, "top_p": 0.9, "temperature": 0.9},
     },
-    "smooth": {
-        "prompt": "make this smoother and more natural:",
-        "generate_args": {
-            "num_beams": 5,
-        }
-    },
-    "smarter": {
-        "prompt": "rewrite to sound more intelligent:",
-        "generate_args": {
-            "num_beams": 5,
-        }
-    },
-    "shorten": {
-        "prompt": "summarize:",
-        "generate_args": {
-            "num_beams": 5,
-            "max_new_tokens": 120,
-        }
-    },
-    "expand": {
-        "prompt": "expand and elaborate:",
-        "generate_args": {
-            "num_beams": 5,
-            "max_new_tokens": 400,
-        }
-    },
+    "smooth": {"prompt": "make this smoother and more natural:", "generate_args": {"num_beams": 2}},
+    "smarter": {"prompt": "rewrite to sound more intelligent:", "generate_args": {"num_beams": 2}},
+    "shorten": {"prompt": "summarize:", "generate_args": {"num_beams": 2, "max_new_tokens": 100}},
+    "expand": {"prompt": "expand and elaborate:", "generate_args": {"num_beams": 2, "max_new_tokens": 200}},
 }
-
-DEFAULT_MAX_NEW_TOKENS = 256
 
 
 def load_model() -> Tuple[PreTrainedTokenizer, PreTrainedModel, torch.device]:
@@ -104,66 +53,60 @@ def load_model() -> Tuple[PreTrainedTokenizer, PreTrainedModel, torch.device]:
     return _tokenizer, _model, _device
 
 
-def chunk_text_by_tokens(text: str, tokenizer, model, buffer: int = 20) -> List[str]:
-    max_positions = model.config.max_position_embeddings
-    safe_max_tokens = max_positions - buffer
-
+def chunk_text_by_tokens(text: str, tokenizer) -> List[str]:
     inputs = tokenizer(text, return_tensors="pt", truncation=False)
     input_ids = inputs["input_ids"][0]
 
     chunks = []
-    for i in range(0, len(input_ids), safe_max_tokens):
-        chunk_ids = input_ids[i: i + safe_max_tokens]
+    for i in range(0, len(input_ids), MAX_MODEL_TOKENS):
+        chunk_ids = input_ids[i: i + MAX_MODEL_TOKENS]
         chunk_text = tokenizer.decode(chunk_ids, skip_special_tokens=True)
         if chunk_text.strip():
             chunks.append(chunk_text)
 
-    return chunks
+    return chunks[:MAX_CHUNKS]
 
 
-def paraphrase_chunk(text: str, mode: str) -> str:
-    tokenizer, model, device = load_model()
-
+def paraphrase_chunk(text: str, mode: str, tokenizer, model, device) -> str:
     if mode not in MODE_CONFIG:
-        raise ValueError(
-            f"Invalid mode '{mode}'. Available modes: {list(MODE_CONFIG.keys())}"
-        )
+        raise ValueError(f"Invalid mode '{mode}'")
 
     config = MODE_CONFIG[mode]
-
-    # Fix 1: Use the mode-specific prompt instead of hardcoded "paraphrase:"
     prompt = f"{config['prompt']} {text} </s>"
 
     inputs = tokenizer(
         prompt,
         return_tensors="pt",
         truncation=True,
-        max_length=model.config.max_position_embeddings,
+        max_length=MAX_MODEL_TOKENS,
     )
+
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
-    # Fix 2: Pull max_new_tokens out of generate_args before unpacking to avoid
-    # duplicate keyword argument error when it appears in both places.
     extra_args = {k: v for k, v in config["generate_args"].items() if k != "max_new_tokens"}
     max_new_tokens = config["generate_args"].get("max_new_tokens", DEFAULT_MAX_NEW_TOKENS)
 
-    generate_args = {
-        "input_ids": inputs["input_ids"],
-        "attention_mask": inputs["attention_mask"],
-        "max_new_tokens": max_new_tokens,
-        **extra_args,
-    }
-
     with torch.no_grad():
-        outputs = model.generate(**generate_args)
+        outputs = model.generate(
+            input_ids=inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+            max_new_tokens=max_new_tokens,
+            **extra_args,
+        )
 
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 
 def generate_paraphrase(text: str, mode: str = "standard") -> str:
-    tokenizer, model, _ = load_model()
+    if len(text) > MAX_INPUT_CHARS:
+        raise ValueError("Input too long")
 
-    chunks = chunk_text_by_tokens(text, tokenizer, model)
-    paraphrased_chunks = [paraphrase_chunk(chunk, mode) for chunk in chunks]
+    tokenizer, model, device = load_model()
 
-    return "\n\n".join(paraphrased_chunks)
+    chunks = chunk_text_by_tokens(text, tokenizer)
+
+    results = []
+    for chunk in chunks:
+        results.append(paraphrase_chunk(chunk, mode, tokenizer, model, device))
+
+    return "\n\n".join(results)
