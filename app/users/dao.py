@@ -2,6 +2,7 @@ from typing import Optional
 import asyncpg
 import uuid
 from app.users.model import UserDB
+from datetime import datetime, timedelta
 
 
 class UserDAO:
@@ -57,3 +58,38 @@ class UserDAO:
             role,
         )
         return row["id"]
+
+    async def create_password_reset_token(self, user_id, token_hash):
+        query = """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)"""
+        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        await self.conn.execute(
+            query,
+            user_id,
+            token_hash,
+            expires_at
+        )
+
+    async def get_valid_reset_token(self, token_hash: str):
+        query = """
+            SELECT *
+            FROM password_reset_tokens
+            WHERE token_hash = $1
+            AND used = FALSE
+            AND expires_at > now()"""
+        return await self.conn.fetchrow(query, token_hash)
+
+    async def mark_reset_token_used(self, token_hash: str):
+        query = """
+        UPDATE password_reset_tokens
+        SET used = TRUE
+        WHERE token_hash = $1
+        """
+        return self.conn.execute(query, token_hash)
+
+    async def update_password(self, user_id, hashed_password):
+        query = """
+        UPDATE users
+        SET password_hash = $1
+        WHERE id = $2
+        """
+        await self.conn.execute(query, hashed_password, user_id)

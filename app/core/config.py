@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # Rate limiting (optional)
     RATE_LIMIT: int = 100  # Requests per minute
 
+    # GOOGLE CLIENT ID
+    GOOGLE_CLIENT_ID: str
+
+    # Resend API KEY
+    RESEND_API_KEY: str
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
