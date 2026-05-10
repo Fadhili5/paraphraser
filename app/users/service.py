@@ -5,6 +5,8 @@ from app.users.dao import UserDAO
 from app.auth.password_handler import hash_password, verify_password, DUMMY_PASSWORD_HASH
 from app.auth.jwt import create_access_token
 from app.users.model import UserRegisterResponse, TokenResponse
+from app.auth.reset_token import generate_reset_token, hash_token
+from app.services.email_service import EmailService
 
 
 class UserService:
@@ -89,4 +91,44 @@ class UserService:
         )
 
         return TokenResponse(access_token=access_token)
+
+    async def forgot_password(self, email: str):
+        user = await self.dao.get_by_email(email)
+        if not user:
+            return {
+                "message": "If the account exists, a reset link has been sent"
+            }
+        raw_token, token_hash = generate_reset_token()
+
+        await self.dao.create_password_reset_token(
+            user["id"],
+            token_hash
+        )
+        reset_link = f"https://frontendurl.com/reset-password?token={raw_token}"
+
+        # send email link
+        await EmailService.send_password_email(
+            email=email,
+            reset_link=reset_link,
+        )
+
+        return {
+            "message": "If the account exists, a reset email has been sent"
+        }
+
+    async def reset_password(self, token: str, new_password: str):
+        token_hash = hash_token(token)
+        reset_record = await self.dao.get_valid_reset_token(token_hash)
+        if not reset_record:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or expired token"
+            )
+        hashed_password = self.hash_password(new_password)
+
+        await self.dao.mark_reset_token_used(token_hash)
+        return {
+            "message": "Password reset successful"
+        }
+
 
