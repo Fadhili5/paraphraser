@@ -29,7 +29,7 @@ async def register_user(request: Request, payload: UserRegisterRequest, db_pool:
         )
 
 @router.post("/login", response_model=TokenResponse)
-@rate_limit(limit=3, window=60)
+@rate_limit(limit=5, window=60)
 async def user_login(request: Request, payload: UserLoginRequest, db_pool: asyncpg.pool.Pool = Depends(get_pool)):
     guard_captcha(token=payload.recaptcha_token, expected_action="login", min_score=0.5)
     async with db_pool.acquire() as conn:
@@ -56,7 +56,7 @@ async def google_login(payload: GoogleAuthRequest):
     }
 
 @router.post("/forgot_password")
-@rate_limit(limit=3, window=60)
+@rate_limit(limit=5, window=60)
 async def forgot_password(request: Request, payload: ForgotPasswordRequest, db_pool: asyncpg.pool.Pool = Depends(get_pool)):
     guard_captcha(
         token=payload.recaptcha_token,
@@ -70,7 +70,7 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db_p
         return await service.forgot_password(email=payload.email)
 
 @router.post("/reset_password")
-@rate_limit(limit=3, window=60)
+@rate_limit(limit=5, window=60)
 async def reset_password(request: Request, payload: ResetPasswordRequest, db_pool: asyncpg.pool.Pool = Depends(get_pool)):
     async with db_pool.acquire() as conn:
         user_dao = UserDAO(conn)
