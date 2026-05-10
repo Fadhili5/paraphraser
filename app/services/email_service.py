@@ -6,6 +6,12 @@ resend.api_key = settings.RESEND_API_KEY
 class EmailService:
     @staticmethod
     async def send_password_email(email: str, reset_link: str):
+        if not settings.RESEND_API_KEY:
+            raise RuntimeError(
+                "RESEND_API_KEY is not configured"
+            )
+        resend.api_key = settings.RESEND_API_KEY
+
         resend.Emails.send({
             "from": "noreply@paraphraser.com",
             "to": email,

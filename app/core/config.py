@@ -30,10 +30,10 @@ class Settings(BaseSettings):
     RATE_LIMIT: int = 100  # Requests per minute
 
     # GOOGLE CLIENT ID
-    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_ID: str | None = None
 
     # Resend API KEY
-    RESEND_API_KEY: str
+    RESEND_API_KEY: str | None = None
 
     class Config:
         env_file = ".env"
