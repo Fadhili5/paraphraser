@@ -1,6 +1,7 @@
 # db/connection.py
 import asyncpg
 from app.core.config import settings
+import ssl
 
 db_pool = None
 
@@ -13,10 +14,12 @@ async def init_db_pool(app):
     safe_url = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', db_url)
     print(f"Attempting to connect to {safe_url}")
 
+    ssl_context = ssl.create_default_context()
+
     try:
         app.state.db_pool = await asyncpg.create_pool(
             dsn=settings.DATABASE_URL,
-            ssl='prefer',  # Changed from "require" string
+            ssl=ssl_context,
             min_size=1,
             max_size=10,
             timeout=30,
