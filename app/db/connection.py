@@ -42,3 +42,4 @@ async def close_db_pool(app):
     pool = getattr(app.state, "db_pool", None)
     if pool:
         await pool.close()
+
