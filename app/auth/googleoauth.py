@@ -4,9 +4,10 @@ from google.auth.transport import requests
 from app.core.config import settings
 
 # Utilize the Google OAuth Client ID from the settings
+GOOGLE_CLIENT_ID = os.getenv("CLIENT_ID")
 if not settings.GOOGLE_CLIENT_ID:
     raise RuntimeError("GOOGLE_CLIENT_ID is not configured")
-GOOGLE_CLIENT_ID = os.getenv("CLIENT_ID")
+
 
 def verify_google_token(token: str) -> dict | None:
     try:
