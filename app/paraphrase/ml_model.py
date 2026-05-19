@@ -2,7 +2,10 @@
 import anthropic
 from app.core.config import settings
 
-client = anthropic.Anthropic(api_key=settings.ANTHROP_API_KEY)
+if not settings.ANTHROPIC_API_KEY:
+    raise RuntimeError("ANTHROPIC_API_KEY not configured")
+
+client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 MAX_INPUT_CHARS = 3000
 
