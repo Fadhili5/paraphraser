@@ -1,8 +1,7 @@
-# app/services/paraphraser.py
+# app/paraphrase/ml_model.py
 import anthropic
 from app.core.config import settings
 
-# Initialize Client from Settings (falls back to ANTHROPIC_API_KEY env var)
 client = anthropic.Anthropic(api_key=settings.ANTHROP_API_KEY)
 
 MAX_INPUT_CHARS = 3000
