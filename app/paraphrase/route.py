@@ -1,11 +1,9 @@
-# fixed the dict vs int problem in this file
-
 import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 
-from app.paraphrase.ml_model import generate_paraphrase
 from app.paraphrase.paraphrase_schema import ParaphraseRequest, ParaphraseResponse
+from app.paraphrase.ml_model import generate_paraphrase
 
 logger = logging.getLogger(__name__)
 from app.paraphrase.doc_paraphraser import extract_text_from_file
@@ -14,7 +12,8 @@ from app.billing.usage_guard import usage_guard
 from app.billing.plans import PLAN_LIMITS
 from app.paraphrase.limits import MAX_FILE_SIZE_BYTES, MAX_CHARACTERS
 
-router = APIRouter(prefix="/v1/paraphrase", tags=["Paraphrase"])
+
+router = APIRouter(prefix="/v1/paraphrase", tags=["paraphrase"])
 
 allowed_content_types = {
     "application/pdf",
@@ -30,20 +29,20 @@ async def paraphrase_text(request: ParaphraseRequest):
     if not text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Text cannot be empty",
+            detail="Text cannot be empty"
         )
 
     if len(text) > MAX_CHARACTERS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Text exceeds maximum allowed length of {MAX_CHARACTERS} characters",
+            detail=f"Text exceeds maximum allowed length of {MAX_CHARACTERS} characters"
         )
 
     try:
         paraphrased_text = await run_in_threadpool(
             generate_paraphrase,
             text,
-            request.mode
+            request.mode,
         )
     except Exception as e:
         logger.exception(
@@ -52,7 +51,7 @@ async def paraphrase_text(request: ParaphraseRequest):
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Paraphrasing failed",
+            detail="Paraphrasing Failed",
         )
 
     return ParaphraseResponse(
@@ -61,35 +60,27 @@ async def paraphrase_text(request: ParaphraseRequest):
         paraphrased_length=len(paraphrased_text),
     )
 
-
 @router.post("/document")
-async def paraphrase_doc(
-    file: UploadFile = File(...),
-    user=Depends(paid_user),
-):
-    # Read file
+async def paraphrase_doc(file: UploadFile = File(...), user=Depends(paid_user)):
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An empty file was uploaded",
+            detail="An empty file was uploaded"
         )
 
-    # Check file size
     if len(file_bytes) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail="File is too large",
+            detail="File is too large"
         )
 
-    # Check content type
     if file.content_type not in allowed_content_types:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file type",
+            detail="Unsupported file type"
         )
 
-    # Extract text
     try:
         extracted_text = extract_text_from_file(
             file_bytes=file_bytes,
@@ -98,13 +89,13 @@ async def paraphrase_doc(
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to extract text from document",
+            detail="Failed to extract text from file"
         )
 
     if not extracted_text or not extracted_text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The uploaded document has no readable text",
+            detail="The uploaded document has no readable text"
         )
 
     # Enforce plan limits
@@ -114,29 +105,28 @@ async def paraphrase_doc(
     if not plan_config:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unknown subscription plan",
+            detail="Unknown subscription plan"
         )
-
     max_chars = plan_config["max_characters"]
-
     if len(extracted_text) > max_chars:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="The provided document exceeds your plan limits",
+            detail="The provided document exceeds your plan limits"
         )
 
-    # Usage guard AFTER knowing how many characters we need
+    # Usage guard after knowing how many characters we need
     # This is where the dict vs int problem is fixed
     await usage_guard(len(extracted_text))(user)
 
-    # Paraphrase text
+    # Paraphrase text: (Default to "standard" mode for documents)
     try:
         paraphrased_text = await run_in_threadpool(
             generate_paraphrase,
             extracted_text,
+            "standard",
         )
     except Exception as e:
-        logger.exception(f"Document paraphrasing failed: {type(e).__name__}: {str(e)}")
+        logger.exception(f"Document Paraphrasing failed: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Paraphrasing failed: {type(e).__name__}: {str(e)}",

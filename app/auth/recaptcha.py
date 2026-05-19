@@ -1,19 +1,18 @@
-import os
+# app/services/captcha.py
 import requests
 from fastapi import HTTPException
 from starlette import status
+from app.core.config import settings
+
 
 def guard_captcha(token: str, expected_action: str, min_score: float = 0.5):
-    env = os.getenv("ENV", "development")
-
-    if env == "development":
+    if settings.ENV == "development":
         return {
             "score": 1.0,
             "action": expected_action,
         }
-    secret = os.getenv("RECAPTCHA_SECRET")
 
-    if not secret:
+    if not settings.RECAPTCHA_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Captcha service not configured",
@@ -23,7 +22,7 @@ def guard_captcha(token: str, expected_action: str, min_score: float = 0.5):
         response = requests.post(
             "https://www.google.com/recaptcha/api/siteverify",
             data={
-                "secret": secret,
+                "secret": settings.RECAPTCHA_SECRET,
                 "response": token,
             },
             timeout=5,
