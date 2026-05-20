@@ -12,6 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 async def create_tables(app):
     pool = await get_pool(app)
-    async with pool as conn:
+    async with pool.acquire() as conn:
         await conn.execute(CREATE_USERS_TABLE)
 
