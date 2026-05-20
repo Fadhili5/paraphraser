@@ -2,19 +2,15 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.api.ex_router import api_router
 from app.db.connection import init_db_pool, close_db_pool
 from app.db.schema import create_tables
-from app.paraphrase.ml_model import load_model
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await init_db_pool(app)
     await create_tables(app)
-    load_model()
     yield
     # Shutdown
     await close_db_pool(app)
